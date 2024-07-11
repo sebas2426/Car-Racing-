@@ -1,9 +1,16 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Window.hpp>
+#include <SFML/System.hpp>
+#include <SFML/Audio.hpp>
+#include <algorithm>
+#include <vector>
+#include <string>
 #include <cmath>
 #include <iostream>
-#include <sstream> // para std::stringstream
+#include <sstream>
 
 using namespace sf;
+using namespace std;
 
 const int num = 8; // checkpoints
 int points[num][2] = {
@@ -28,7 +35,7 @@ const float finishLineY = 1740;
 bool showMessage = false;
 const float decelerationFactor = 4.8;
 
-// Función de clamping manual
+// FunciÃ³n de clamping manual
 template <typename T>
 T clamp(T value, T min, T max) {
     if (value < min) return min;
@@ -81,6 +88,13 @@ struct Car {
         }
         return false;
     }
+
+    // Calcula la distancia al siguiente checkpoint
+    float distanceToNextCheckpoint() const {
+        float tx = points[n][0];
+        float ty = points[n][1];
+        return sqrt((x - tx) * (x - tx) + (y - ty) * (y - ty));
+    }
 };
 
 void handleCollisions(Car& car1, Car& car2, float R) {
@@ -91,7 +105,7 @@ void handleCollisions(Car& car1, Car& car2, float R) {
     if (distanceSquared < minDist * minDist) {
         float distance = std::sqrt(distanceSquared);
         if (distance == 0) {
-            distance = 0.1f; // para evitar la división por cero
+            distance = 0.1f; // para evitar la divisiÃ³n por cero
         }
         float overlap = minDist - distance;
         float shiftX = dx / distance * overlap / 2;
@@ -141,9 +155,10 @@ int main() {
     int offsetX = 0, offsetY = 0;
     bool isGameFinished = false;
     bool raceStarted = false;
+    bool showGoMessage = false;
 
     sf::Font font;
-    if (!font.loadFromFile("GibstoneTrial-Black.ttf")) {
+    if (!font.loadFromFile("Broaek- Regular.ttf")) {
         std::cerr << "Error cargando la fuente" << std::endl;
         return -1;
     }
@@ -152,8 +167,8 @@ int main() {
     message.setFont(font);
     message.setCharacterSize(24);
     message.setFillColor(sf::Color::White);
-    message.setPosition(70, 60);
-    message.setString("¡Terminaste la carrera!\nQuedaste en el puesto: 5");
+    message.setPosition(220, 60);
+    message.setString("Â¡Terminaste la carrera!\n");
 
     sf::RectangleShape frame(sf::Vector2f(message.getLocalBounds().width + 30, message.getLocalBounds().height + 30));
     frame.setFillColor(sf::Color::Transparent);
@@ -166,8 +181,38 @@ int main() {
     countdownText.setFillColor(sf::Color::White);
     countdownText.setPosition(300, 200);
 
+    sf::Text goText;
+    goText.setFont(font);
+    goText.setCharacterSize(48);
+    goText.setFillColor(sf::Color::White);
+    goText.setPosition(280, 200);
+    goText.setString("YA!!");
+
     sf::Clock countdownClock;
-    int countdown = 3;
+    sf::Clock goClock;
+    int countdown = 4;
+    bool countdownFinished = false;
+
+    // Cargar el sonido de arranque
+    sf::SoundBuffer buffer;
+    if (!buffer.loadFromFile("arranque.wav")) {
+        std::cerr << "Error cargando el sonido de arranque" << std::endl;
+        return -1;
+    }
+    sf::Sound startSound;
+    startSound.setBuffer(buffer);
+
+    // Reproducir el sonido de arranque una vez al inicio de la cuenta regresiva
+    startSound.play();
+    
+    sf::Music backgroundMusic;
+    if (!backgroundMusic.openFromFile("background.wav")) {
+        std::cerr << "Error cargando la mÃºsica de fondo" << std::endl;
+        return -1;
+    }
+    backgroundMusic.setLoop(true); // Para que la mÃºsica se reproduzca en bucle
+    backgroundMusic.setVolume(30);
+    backgroundMusic.play();
 
     while (app.isOpen()) {
         Event e;
@@ -178,9 +223,20 @@ int main() {
         if (!raceStarted) {
             int elapsed = static_cast<int>(countdownClock.getElapsedTime().asSeconds());
             if (elapsed >= countdown) {
-                raceStarted = true;
+                if (!countdownFinished) {
+                    showGoMessage = true;
+                    goClock.restart();
+                    countdownFinished = true;
+                } else if (goClock.getElapsedTime().asSeconds() >= 1) {
+                    showGoMessage = false;
+                    raceStarted = true;
+                }
             } else {
                 countdownText.setString(intToString(countdown - elapsed));
+                // Reproducir el sonido de arranque repetidamente durante la cuenta regresiva
+                if (startSound.getStatus() == sf::Sound::Stopped) {
+                    startSound.play();
+                }
             }
         }
 
@@ -211,12 +267,12 @@ int main() {
                     car[i].speed = std::max(0.0f, car[i].speed - decelerationFactor);
                 }
             }
+        }
 
-            // Colisiones
-            for (int i = 0; i < N; ++i) {
-                for (int j = i + 1; j < N; ++j) {
-                    handleCollisions(car[i], car[j], R);
-                }
+        // Colisiones
+        for (int i = 0; i < N; ++i) {
+            for (int j = i + 1; j < N; ++j) {
+                handleCollisions(car[i], car[j], R);
             }
         }
 
@@ -239,7 +295,7 @@ int main() {
         }
 
         Color colors[10] = {Color::Red, Color::Green, Color::Magenta, Color::Blue, Color::White};
-        for (int i = 0; i < N; ++i) {
+        for (int i = 0; i < N; i++) {
             sCar.setPosition(car[i].x - offsetX, car[i].y - offsetY);
             sCar.setRotation(car[i].angle * 180 / 3.141593);
             sCar.setColor(colors[i]);
@@ -253,8 +309,12 @@ int main() {
             app.draw(message);
         }
 
-        if (!raceStarted) {
+        if (!raceStarted && !showGoMessage) {
             app.draw(countdownText);
+        }
+
+        if (showGoMessage) {
+            app.draw(goText);
         }
 
         app.display();
@@ -263,6 +323,7 @@ int main() {
             app.close();
         }
     }
+    backgroundMusic.stop();
 
     return 0;
 }
