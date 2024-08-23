@@ -7,7 +7,7 @@
 #include <string>
 #include <cmath>
 #include <iostream>
-#include <sstream>
+#include <sstream> // para std::stringstream
 
 using namespace sf;
 using namespace std;
@@ -155,7 +155,6 @@ int main() {
     int offsetX = 0, offsetY = 0;
     bool isGameFinished = false;
     bool raceStarted = false;
-    bool showGoMessage = false;
 
     sf::Font font;
     if (!font.loadFromFile("Broaek- Regular.ttf")) {
@@ -167,7 +166,7 @@ int main() {
     message.setFont(font);
     message.setCharacterSize(24);
     message.setFillColor(sf::Color::White);
-    message.setPosition(220, 60);
+    message.setPosition(70, 60);
     message.setString("¡Terminaste la carrera!\n");
 
     sf::RectangleShape frame(sf::Vector2f(message.getLocalBounds().width + 30, message.getLocalBounds().height + 30));
@@ -181,17 +180,8 @@ int main() {
     countdownText.setFillColor(sf::Color::White);
     countdownText.setPosition(300, 200);
 
-    sf::Text goText;
-    goText.setFont(font);
-    goText.setCharacterSize(48);
-    goText.setFillColor(sf::Color::White);
-    goText.setPosition(280, 200);
-    goText.setString("YA!!");
-
     sf::Clock countdownClock;
-    sf::Clock goClock;
-    int countdown = 4;
-    bool countdownFinished = false;
+    int countdown = 3;
 
     // Cargar el sonido de arranque
     sf::SoundBuffer buffer;
@@ -206,13 +196,13 @@ int main() {
     startSound.play();
     
     sf::Music backgroundMusic;
-    if (!backgroundMusic.openFromFile("background.wav")) {
-        std::cerr << "Error cargando la música de fondo" << std::endl;
-        return -1;
-    }
-    backgroundMusic.setLoop(true); // Para que la música se reproduzca en bucle
-    backgroundMusic.setVolume(30);
-    backgroundMusic.play();
+	if (!backgroundMusic.openFromFile("background.wav")) {
+    std::cerr << "Error cargando la música de fondo" << std::endl;
+    return -1;
+}
+backgroundMusic.setLoop(true); // Para que la música se reproduzca en bucle
+backgroundMusic.setVolume(50);
+backgroundMusic.play();
 
     while (app.isOpen()) {
         Event e;
@@ -223,14 +213,7 @@ int main() {
         if (!raceStarted) {
             int elapsed = static_cast<int>(countdownClock.getElapsedTime().asSeconds());
             if (elapsed >= countdown) {
-                if (!countdownFinished) {
-                    showGoMessage = true;
-                    goClock.restart();
-                    countdownFinished = true;
-                } else if (goClock.getElapsedTime().asSeconds() >= 1) {
-                    showGoMessage = false;
-                    raceStarted = true;
-                }
+                raceStarted = true;
             } else {
                 countdownText.setString(intToString(countdown - elapsed));
                 // Reproducir el sonido de arranque repetidamente durante la cuenta regresiva
@@ -268,7 +251,7 @@ int main() {
                 }
             }
         }
-
+        
         // Colisiones
         for (int i = 0; i < N; ++i) {
             for (int j = i + 1; j < N; ++j) {
@@ -309,12 +292,8 @@ int main() {
             app.draw(message);
         }
 
-        if (!raceStarted && !showGoMessage) {
+        if (!raceStarted) {
             app.draw(countdownText);
-        }
-
-        if (showGoMessage) {
-            app.draw(goText);
         }
 
         app.display();
